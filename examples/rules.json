@@ -1,0 +1,7 @@
+[
+  {
+    "name": "tenant-id",
+    "pattern": "TENANT-[0-9]+",
+    "replacement": "[REDACTED:TENANT]"
+  }
+]

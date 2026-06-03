@@ -1,0 +1,4 @@
+Authorization: Bearer not-a-real-example-token
+email maintainer@example.invalid
+api_key=not-a-real-example-key
+password=not-a-real-example-password
