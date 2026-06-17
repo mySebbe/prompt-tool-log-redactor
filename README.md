@@ -2,6 +2,11 @@
 
 `prompt-tool-log-redactor` redacts common secrets and PII from plain text or JSONL logs. It is stdlib-only and supports custom regex rules in a JSON file.
 
+## 0.1.1 Highlights
+
+- Default redaction now covers GitHub tokens, AWS access keys, and Slack tokens.
+- JSONL redaction treats more nested key names as sensitive, including credentials and private keys.
+
 ## Install
 
 ```bash
