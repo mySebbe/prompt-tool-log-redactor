@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "prompt-tool-log-redactor"
-version = "0.1.0"
+version = "0.1.1"
 description = "Redact common secrets and PII from plain text and JSONL logs."
 readme = "README.md"
 requires-python = ">=3.11"
