@@ -17,7 +17,20 @@ class RedactionRule:
     replacement: str
 
 
-SENSITIVE_KEYS = {"password", "passwd", "pwd", "secret", "token", "api_key", "apikey", "authorization"}
+SENSITIVE_KEYS = {
+    "access_key",
+    "api_key",
+    "apikey",
+    "authorization",
+    "credential",
+    "credentials",
+    "password",
+    "passwd",
+    "private_key",
+    "pwd",
+    "secret",
+    "token",
+}
 
 
 def _compile(pattern: str, flags: int = 0) -> Pattern[str]:
@@ -27,6 +40,9 @@ def _compile(pattern: str, flags: int = 0) -> Pattern[str]:
 DEFAULT_RULES: tuple[RedactionRule, ...] = (
     RedactionRule("EMAIL", _compile(r"\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}\b"), "[REDACTED:EMAIL]"),
     RedactionRule("OPENAI_KEY", _compile(r"\bsk-[A-Za-z0-9_-]{8,}\b"), "[REDACTED:SECRET]"),
+    RedactionRule("GITHUB_TOKEN", _compile(r"\b(?:gh[pousr]_[A-Za-z0-9_]{20,}|github_pat_[A-Za-z0-9_]{20,}_[A-Za-z0-9_]{20,})\b"), "[REDACTED:GITHUB_TOKEN]"),
+    RedactionRule("AWS_ACCESS_KEY", _compile(r"\b(?:AKIA|ASIA)[A-Z0-9]{16}\b"), "[REDACTED:AWS_ACCESS_KEY]"),
+    RedactionRule("SLACK_TOKEN", _compile(r"\bxox[abprs]-[A-Za-z0-9-]{10,}\b"), "[REDACTED:SLACK_TOKEN]"),
     RedactionRule("BEARER", _compile(r"(?i)\bBearer\s+(?:Bearer\s+)?[A-Za-z0-9._~+/=-]+"), "Bearer [REDACTED:BEARER]"),
     RedactionRule(
         "PASSWORD",
