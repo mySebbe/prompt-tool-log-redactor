@@ -31,6 +31,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--jsonl", action="store_true", help="Treat input as newline-delimited JSON.")
     parser.add_argument("--rules", help="JSON file with custom regex redaction rules.")
     parser.add_argument("--output", "-o", help="Output file. Writes stdout when omitted.")
+    parser.add_argument("--check", action="store_true", help="Exit 1 if input contains redactable content without writing output.")
     return parser
 
 
@@ -41,6 +42,11 @@ def main(argv: list[str] | None = None) -> int:
         rules = load_rules(args.rules)
         text = _read(args.path)
         redacted = redact_jsonl(text, rules) if args.jsonl else redact_text(text, rules)
+        if args.check:
+            if redacted != text:
+                print("prompt-tool-log-redactor: redactions needed", file=sys.stderr)
+                return 1
+            return 0
         _write(args.output, redacted)
     except (OSError, ValueError) as exc:
         print(f"prompt-tool-log-redactor: {exc}", file=sys.stderr)

@@ -2,10 +2,10 @@
 
 `prompt-tool-log-redactor` redacts common secrets and PII from plain text or JSONL logs. It is stdlib-only and supports custom regex rules in a JSON file.
 
-## 0.1.1 Highlights
+## 0.1.2 Highlights
 
-- Default redaction now covers GitHub tokens, AWS access keys, and Slack tokens.
-- JSONL redaction treats more nested key names as sensitive, including credentials and private keys.
+- `--check` mode now detects redactable content without writing redacted output.
+- CI workflows can fail fast when logs still contain secrets or personal data.
 
 ## Install
 
@@ -19,6 +19,7 @@ python -m pip install .
 prompt-tool-log-redactor logs.txt
 prompt-tool-log-redactor --jsonl trace.jsonl
 prompt-tool-log-redactor --rules rules.json < logs.txt
+prompt-tool-log-redactor --check logs.txt
 python -m prompt_tool_log_redactor --output redacted.txt logs.txt
 ```
 
