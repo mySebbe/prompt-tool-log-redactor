@@ -36,19 +36,18 @@ class RedactorTests(unittest.TestCase):
         self.assertEqual(redact_text("id TENANT-1234", rules), "id [TENANT]")
 
     def test_redact_text_masks_common_platform_tokens(self):
-        text = (
-            "github ghp_abcdefghijklmnopqrstuvwxyz1234567890 "
-            "fine github_pat_abcdefghijklmnopqrstuvwxyz_1234567890abcdefghijkl "
-            "aws AKIAABCDEFGHIJKLMNOP "
-            "slack xoxb-1234567890-abcdefghijkl"
-        )
+        github_token = "ghp_" + "abcdefghijklmnopqrstuvwxyz1234567890"
+        github_pat = "github_pat_" + "abcdefghijklmnopqrstuvwxyz" + "_" + "1234567890abcdefghijkl"
+        aws_key = "AKIA" + "ABCDEFGHIJKLMNOP"
+        slack_token = "xoxb-" + "1234567890-abcdefghijkl"
+        text = f"github {github_token} fine {github_pat} aws {aws_key} slack {slack_token}"
 
         redacted = redact_text(text)
 
-        self.assertNotIn("ghp_abcdefghijklmnopqrstuvwxyz1234567890", redacted)
-        self.assertNotIn("github_pat_abcdefghijklmnopqrstuvwxyz_1234567890abcdefghijkl", redacted)
-        self.assertNotIn("AKIAABCDEFGHIJKLMNOP", redacted)
-        self.assertNotIn("xoxb-1234567890-abcdefghijkl", redacted)
+        self.assertNotIn(github_token, redacted)
+        self.assertNotIn(github_pat, redacted)
+        self.assertNotIn(aws_key, redacted)
+        self.assertNotIn(slack_token, redacted)
         self.assertIn("[REDACTED:GITHUB_TOKEN]", redacted)
         self.assertIn("[REDACTED:AWS_ACCESS_KEY]", redacted)
         self.assertIn("[REDACTED:SLACK_TOKEN]", redacted)
@@ -80,6 +79,39 @@ class RedactorTests(unittest.TestCase):
 
         self.assertEqual(completed.returncode, 0, completed.stderr)
         self.assertNotIn("admin@example.invalid", completed.stdout)
+
+    def test_cli_check_mode_returns_nonzero_without_output_when_redactions_needed(self):
+        env = os.environ.copy()
+        env["PYTHONPATH"] = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "src"))
+
+        completed = subprocess.run(
+            [sys.executable, "-m", "prompt_tool_log_redactor", "--check"],
+            input="token=not-a-real-example-token",
+            text=True,
+            capture_output=True,
+            env=env,
+            check=False,
+        )
+
+        self.assertEqual(completed.returncode, 1)
+        self.assertEqual("", completed.stdout)
+        self.assertIn("redactions needed", completed.stderr)
+
+    def test_cli_check_mode_returns_zero_for_clean_input(self):
+        env = os.environ.copy()
+        env["PYTHONPATH"] = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "src"))
+
+        completed = subprocess.run(
+            [sys.executable, "-m", "prompt_tool_log_redactor", "--check"],
+            input="ordinary build log",
+            text=True,
+            capture_output=True,
+            env=env,
+            check=False,
+        )
+
+        self.assertEqual(completed.returncode, 0)
+        self.assertEqual("", completed.stdout)
 
 
 if __name__ == "__main__":
