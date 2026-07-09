@@ -9,6 +9,12 @@ from dataclasses import dataclass
 from re import Pattern
 from typing import Any
 
+MAX_RULES_FILE_BYTES = 256 * 1024
+MAX_RULE_COUNT = 128
+MAX_RULE_PATTERN_LENGTH = 4096
+MAX_RULE_REPLACEMENT_LENGTH = 4096
+DEFAULT_MAX_INPUT_BYTES = 10 * 1024 * 1024
+
 
 @dataclass(frozen=True)
 class RedactionRule:
@@ -62,6 +68,8 @@ DEFAULT_RULES: tuple[RedactionRule, ...] = (
 def _flags_from_names(names: Iterable[str]) -> int:
     flags = 0
     for name in names:
+        if not isinstance(name, str):
+            raise ValueError("regex flags must be strings")
         normalized = name.upper()
         if normalized == "IGNORECASE":
             flags |= re.IGNORECASE
@@ -74,26 +82,81 @@ def _flags_from_names(names: Iterable[str]) -> int:
     return flags
 
 
-def load_rules(path: str | None) -> list[RedactionRule]:
+def _read_limited_bytes(handle: Any, max_bytes: int, description: str) -> bytes:
+    if max_bytes < 0:
+        raise ValueError(f"{description} limit must be non-negative")
+
+    chunks: list[bytes] = []
+    total = 0
+    while True:
+        chunk = handle.read(min(64 * 1024, max_bytes - total + 1))
+        if chunk in (b"", ""):
+            break
+        if isinstance(chunk, str):
+            try:
+                chunk = chunk.encode("utf-8")
+            except UnicodeEncodeError as exc:
+                raise ValueError(f"{description} must be valid UTF-8") from exc
+        if not isinstance(chunk, (bytes, bytearray)):
+            raise ValueError(f"unable to read {description}")
+        chunk_bytes = bytes(chunk)
+        total += len(chunk_bytes)
+        if total > max_bytes:
+            raise ValueError(f"{description} exceeds maximum size of {max_bytes} bytes")
+        chunks.append(chunk_bytes)
+    return b"".join(chunks)
+
+
+def load_rules(path: str | None, max_rules_file_bytes: int = MAX_RULES_FILE_BYTES) -> list[RedactionRule]:
     """Load additional redaction rules from a JSON file."""
     if not path:
         return []
-    with open(path, encoding="utf-8") as handle:
-        raw = json.load(handle)
+    with open(path, "rb") as handle:
+        encoded = _read_limited_bytes(handle, max_rules_file_bytes, "rules file")
+    try:
+        raw = json.loads(encoded.decode("utf-8"))
+    except UnicodeDecodeError as exc:
+        raise ValueError("rules file must be valid UTF-8") from exc
+    except json.JSONDecodeError as exc:
+        raise ValueError(f"rules file is not valid JSON: {exc.msg}") from exc
+    except RecursionError as exc:
+        raise ValueError("rules file is too deeply nested") from exc
     if not isinstance(raw, list):
         raise ValueError("rules file must contain a JSON list")
+    if len(raw) > MAX_RULE_COUNT:
+        raise ValueError(f"rules file contains too many rules; maximum is {MAX_RULE_COUNT}")
 
     rules: list[RedactionRule] = []
     for index, item in enumerate(raw):
         if not isinstance(item, dict):
             raise ValueError(f"rule {index} must be an object")
-        name = str(item.get("name") or f"custom_{index}")
+        name = item.get("name", f"custom_{index}")
+        if not isinstance(name, str) or not name.strip():
+            raise ValueError(f"rule {index} requires a non-empty string name")
         pattern = item.get("pattern")
         if not isinstance(pattern, str) or not pattern:
             raise ValueError(f"rule {index} requires a non-empty pattern")
-        replacement = str(item.get("replacement", f"[REDACTED:{name.upper()}]"))
-        flags = _flags_from_names(item.get("flags", []))
-        rules.append(RedactionRule(name, re.compile(pattern, flags), replacement))
+        if len(pattern) > MAX_RULE_PATTERN_LENGTH:
+            raise ValueError(
+                f"rule {index} pattern exceeds maximum length of {MAX_RULE_PATTERN_LENGTH} characters"
+            )
+        replacement = item.get("replacement", f"[REDACTED:{name.upper()}]")
+        if not isinstance(replacement, str):
+            raise ValueError(f"rule {index} replacement must be a string")
+        if len(replacement) > MAX_RULE_REPLACEMENT_LENGTH:
+            raise ValueError(
+                f"rule {index} replacement exceeds maximum length of {MAX_RULE_REPLACEMENT_LENGTH} characters"
+            )
+        flags_names = item.get("flags", [])
+        if not isinstance(flags_names, list):
+            raise ValueError(f"rule {index} flags must be a list")
+        flags = _flags_from_names(flags_names)
+        try:
+            compiled = re.compile(pattern, flags)
+            compiled.sub(replacement, "")
+        except (IndexError, OverflowError, re.error) as exc:
+            raise ValueError(f"rule {index} contains an invalid regex or replacement: {exc}") from exc
+        rules.append(RedactionRule(name, compiled, replacement))
     return rules
 
 

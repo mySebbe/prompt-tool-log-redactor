@@ -6,7 +6,9 @@ The format is based on Keep a Changelog, and this project uses semantic versioni
 
 ## [Unreleased]
 
-- No unreleased changes yet.
+- Added conservative limits for custom rule file bytes, rule count, regex pattern length, and replacement length.
+- Added a 10 MiB default input limit with configurable `--max-bytes` handling.
+- Invalid or oversized rules and inputs now fail closed with exit code `2`, while `--check` retains its `0`/`1` result for clean or redactable input.
 
 ## [0.1.2] - 2026-07-06
 
